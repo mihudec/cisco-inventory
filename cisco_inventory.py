@@ -1,4 +1,4 @@
-#!/bin/env pyhon3
+#!/bin/env python3
 from nuaal.connections.cli import Cisco_IOS_Cli, CliMultiRunner
 from nuaal.Writers import ExcelWriter
 from nuaal.Parsers import CiscoIOSParser
