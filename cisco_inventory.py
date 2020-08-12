@@ -1,4 +1,4 @@
-#!/bin/env python3
+#! /usr/bin/env python3
 from nuaal.connections.cli import Cisco_IOS_Cli, CliMultiRunner
 from nuaal.Writers import ExcelWriter
 from nuaal.Parsers import CiscoIOSParser
@@ -40,6 +40,7 @@ class CiscoInventory(object):
 
     def __init__(self, user, password, input_file=None, output_file=None, workers=5, verbosity=4):
         self.logger = get_logger(name="CiscoInventory", verbosity=verbosity, with_threads=True)
+        self.verbosity = verbosity
         self.user = user
         self.password = password
         self.input_file = self.check_path(input_file, mode="file")
