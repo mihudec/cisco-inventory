@@ -1,5 +1,7 @@
+#!/bin/env pyhon3
 from nuaal.connections.cli import Cisco_IOS_Cli, CliMultiRunner
 from nuaal.Writers import ExcelWriter
+from nuaal.Parsers import CiscoIOSParser
 import argparse
 import getpass
 import pathlib
@@ -35,8 +37,8 @@ def get_logger(name, verbosity=4, with_threads=False):
 
 
 class CiscoInventory(object):
-    
-    def __init__(self, user, password, input_file=None, output_file=None, verbosity=4):
+
+    def __init__(self, user, password, input_file=None, output_file=None, workers=5, verbosity=4):
         self.logger = get_logger(name="CiscoInventory", verbosity=verbosity, with_threads=True)
         self.user = user
         self.password = password
@@ -45,8 +47,9 @@ class CiscoInventory(object):
         self.logger.info("Output File: {}".format(self.output_file))
 
         self.hosts = None
+        self.workers = workers
         self.data = None
-        
+
     def run(self):
         self.hosts = self.parse_input()
         self.logger.info("Loaded {} hosts.".format(len(self.hosts)))
@@ -81,12 +84,14 @@ class CiscoInventory(object):
             return path
 
     def build_provider(self):
+        parser = CiscoIOSParser()
         provider = {
             "username": self.user,
             "password": self.password,
             "store_outputs": False,
             "enable": True,
-            "DEBUG": False
+            "DEBUG": False,
+            "parser": parser
         }
         return provider
 
@@ -94,7 +99,6 @@ class CiscoInventory(object):
         hosts = []
         with self.input_file.open(mode="r") as f:
             for line in [x.strip() for x in f.readlines()]:
-                print(line)
                 if line.startswith("#"):
                     self.logger.debug("Skiping commented line: {}".format(line))
                     continue
@@ -103,14 +107,16 @@ class CiscoInventory(object):
         return hosts
 
     def get_device_data(self):
-        workers = 5
-        runner = CliMultiRunner(provider=self.build_provider(), ips=self.hosts, actions=["get_inventory"], workers=workers)
+        runner = CliMultiRunner(provider=self.build_provider(), ips=self.hosts, actions=["get_inventory"], workers=self.workers, verbosity=self.verbosity)
         runner.run()
         return runner.data
 
     def get_flat_inventory(self):
         inventory_entries = []
         for device in self.data:
+            if "inventory" not in device.keys():
+                self.logger.error("Could not retrieve inventory for host {}".format(device["ipAddress"]))
+                continue
             for entry in device["inventory"]:
                 print(entry)
                 updated_entry = dict(entry)
@@ -138,6 +144,7 @@ def get_arguments():
     parser.add_argument("-i", "--input", dest="input_file", help="Name or path to input file.")
     parser.add_argument("-o", "--output", dest="output_file", help="Name or path to output file.")
     parser.add_argument("-v", "--verbosity", dest="verbosity", default=4, type=int)
+    parser.add_argument("-w", "--workers", dest="workers", default=5, type=int)
     args = parser.parse_args()
     if args.ask_pass:
         args.password = getpass.getpass()
@@ -145,7 +152,7 @@ def get_arguments():
 
 def main():
     args = get_arguments()
-    inventory = CiscoInventory(user=args.user, password=args.password, input_file=args.input_file, output_file=args.output_file, verbosity=args.verbosity)
+    inventory = CiscoInventory(user=args.user, password=args.password, input_file=args.input_file, workers=args.workers, output_file=args.output_file, verbosity=args.verbosity)
     inventory.run()
 
 
